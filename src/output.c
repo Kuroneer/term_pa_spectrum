@@ -273,19 +273,19 @@ wchar_t* output_print_silence(output_context* out_ctx) {
     return out_ctx->wchar_silence_buffer;
 }
 
-wchar_t* output_print(output_context* out_ctx, double* values) {
-    unsigned int i;
-    unsigned int num_points = out_ctx->num_points;
-    double* acc_buffer = out_ctx->acc_buffer;
-
-    // TRANSFORM
+void transform(output_context* out_ctx, double* values) {
     if (out_ctx->transform_flags & OUTPUT_LOGARITMIC_TRANSFORM) {
-        for (i = out_ctx->min_data_index; i <= out_ctx->max_data_index; ++i) {
+        for (unsigned int i = out_ctx->min_data_index; i <= out_ctx->max_data_index; ++i) {
             values[i] = log(values[i]);
         }
     }
+}
 
-    // ACC
+void accumulate(output_context* out_ctx, double* values) {
+    unsigned int i;
+    double* acc_buffer = out_ctx->acc_buffer;
+    unsigned int num_points = out_ctx->num_points;
+
     for (i = 0; i < num_points; ++i) {
         acc_buffer[i] = 0;
     }
@@ -318,8 +318,18 @@ wchar_t* output_print(output_context* out_ctx, double* values) {
                 acc_buffer[acc_index] = value;
             }
     }
+}
+
+wchar_t* output_print(output_context* out_ctx, double* values) {
+
+    transform(out_ctx, values);
+
+    accumulate(out_ctx, values);
 
     // SMOOTH
+    unsigned int i;
+    unsigned int num_points = out_ctx->num_points;
+    double* acc_buffer = out_ctx->acc_buffer;
     double* smooth_buffer = out_ctx->smooth_buffer;
     double min = 0, max = 0;
     switch (out_ctx->smoothing) {
