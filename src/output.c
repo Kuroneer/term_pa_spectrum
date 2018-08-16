@@ -320,64 +320,70 @@ void accumulate(output_context* out_ctx, double* values) {
     }
 }
 
+void smooth(output_context* out_ctx, double** output_buffer_p, double* min_p, double* max_p) {
+    double* acc_buffer = out_ctx->acc_buffer;
+    double* smooth_buffer = out_ctx->smooth_buffer;
+    double local_min = INFINITY, local_max = 0;
+
+    switch (out_ctx->smoothing) {
+        case OUTPUT_EXP2_SMOOTH:
+            for (unsigned int i = 0; i < out_ctx->num_points; ++i) {
+                if (out_ctx->acc_buffer_data_count[i]) {
+                    double new_value = max((smooth_buffer[i] * out_ctx->smoothing_old_value_factor + acc_buffer[i] * out_ctx->smoothing_new_value_factor), 0);
+                    local_min = min(local_min, new_value);
+                    local_max = max(local_max, new_value);
+                    smooth_buffer[i] = new_value;
+                } else if (i > 0) {
+                    smooth_buffer[i] = smooth_buffer[i-1];
+                }
+            }
+
+            *min_p = out_ctx->smoothing_min_limit * out_ctx->smoothing_old_limit_factor + local_min * out_ctx->smoothing_new_limit_factor;
+            *max_p = out_ctx->smoothing_max_limit * out_ctx->smoothing_old_limit_factor + local_max * out_ctx->smoothing_new_limit_factor;
+            *output_buffer_p = smooth_buffer;
+
+            out_ctx->smoothing_min_limit = *min_p;
+            out_ctx->smoothing_max_limit = *max_p;
+
+            break;
+
+        case OUTPUT_NO_SMOOTH:
+        default:
+            *min_p = out_ctx->abs_min;
+            *max_p = out_ctx->abs_max;
+            *output_buffer_p = acc_buffer;
+    }
+}
+
 wchar_t* output_print(output_context* out_ctx, double* values) {
 
     transform(out_ctx, values);
 
     accumulate(out_ctx, values);
 
-    // SMOOTH
-    unsigned int i;
-    unsigned int num_points = out_ctx->num_points;
-    double* acc_buffer = out_ctx->acc_buffer;
-    double* smooth_buffer = out_ctx->smooth_buffer;
-    double min = 0, max = 0;
-    switch (out_ctx->smoothing) {
-        case OUTPUT_EXP2_SMOOTH:
-            {
-                double local_min = INFINITY, local_max = 0;
-                for (i = 0; i < num_points; ++i) {
-                    if (out_ctx->acc_buffer_data_count[i]) {
-                        double new_value = max((smooth_buffer[i] * out_ctx->smoothing_old_value_factor + acc_buffer[i] * out_ctx->smoothing_new_value_factor), 0);
-                        local_min = min(local_min, new_value);
-                        local_max = max(local_max, new_value);
-                        smooth_buffer[i] = new_value;
-                    } else if (i>0) {
-                        smooth_buffer[i] = smooth_buffer[i-1];
-                    }
-                }
-                min = out_ctx->smoothing_min_limit * out_ctx->smoothing_old_limit_factor + local_min * out_ctx->smoothing_new_limit_factor;
-                max = out_ctx->smoothing_max_limit * out_ctx->smoothing_old_limit_factor + local_max * out_ctx->smoothing_new_limit_factor;
-
-                out_ctx->smoothing_min_limit = min;
-                out_ctx->smoothing_max_limit = max;
-            }
-            break;
-        case OUTPUT_NO_SMOOTH:
-        default:
-            min = out_ctx->abs_min;
-            max = out_ctx->abs_max;
-            smooth_buffer = acc_buffer;
-    }
+    double* output_buffer;
+    double min, max;
+    smooth(out_ctx, &output_buffer, &min, &max);
 
     // SCALE & PRINT TO BUFFER
+    unsigned int num_points = out_ctx->num_points;
     unsigned int levels = out_ctx->visualization_levels;
     unsigned int points_per_char = out_ctx->visualization_points_per_char;
     wchar_t* symbols = out_ctx->visualization_str;
 
     unsigned int wchar_index = -1;
     wchar_t* wchar_buffer = out_ctx->wchar_buffer;
-    for (i = 0; i < num_points; i+=points_per_char) {
+    for (unsigned int i = 0; i < num_points; i += points_per_char) {
         unsigned int current_point = 0;
         unsigned int current_symbol_index = 0;
         for (current_point = 0; current_point < points_per_char; ++current_point) {
             double level = 0;
             if (i + current_point < num_points) {
-                level = ((smooth_buffer[i+current_point] - min) / (max - min)); // Range [0,1]
+                level = ((output_buffer[i+current_point] - min) / (max - min)); // Range [0,1]
             }
 
             if (out_ctx->sigmoid_scaling_factor > 0) {
-                level = 1/(1+exp(-out_ctx->sigmoid_scaling_factor * (level-0.5)));
+                level = 1/(1+exp(-out_ctx->sigmoid_scaling_factor * (level - 0.5)));
             }
 
             int f_ranged = (level * out_ctx->lineal_scaling_factor) * levels;
