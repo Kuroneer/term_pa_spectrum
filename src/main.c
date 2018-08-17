@@ -129,7 +129,6 @@ typedef struct {
 
 int process_data_from_pa(int silence, void* userdata) {
     cb_info_t* cb_info = (cb_info_t*) userdata;
-    int i;
     char new_line_char = cb_info->new_line_char;
     float elapsed = timeSinceLastUpdate();
 
@@ -156,7 +155,7 @@ int process_data_from_pa(int silence, void* userdata) {
     // Process data
     fftw_execute(cb_info->plan);
 
-    for (i = 0; i < cb_info->n_out_values; ++i) {
+    for (int i = 0; i < cb_info->n_out_values; ++i) {
         fftw_complex c_out = cb_info->fftw_out[i];
         cb_info->graph[i] = sqrt(creal(c_out)*creal(c_out) + cimag(c_out)*cimag(c_out));
     }
@@ -168,7 +167,7 @@ int process_data_from_pa(int silence, void* userdata) {
     fflush(stdout);
 #ifdef DEBUG
     fprintf(stderr,  "<%c", new_line_char);
-    for (i = 1; i < 41; ++i) {
+    for (int i = 1; i < 41; ++i) {
         fprintf(stderr, "%4.0f ", cb_info->graph[i]/1000);
     }
 #endif
@@ -353,6 +352,14 @@ int main(int argc, char **argv) {
 
     //// Set up PA
     pa_set_up_read_callback(n_samples, sample_rate, amplitude_samples, process_data_from_pa, &cb_info);
+
+    //// Free memory
+    output_deinit(out_ctx);
+    free(empty_graph);
+    free(graph);
+    free(graph_freq);
+    fftw_free(fftw_out);
+    fftw_free(amplitude_samples);
 
     return 0;
 }
