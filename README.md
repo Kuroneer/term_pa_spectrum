@@ -10,12 +10,14 @@ In the future, I plan to include a widget for awesomewm.
 
 ## Getting Started
 
-Just clone and make it (needs the fftw3 and pulse libraries to make):
+Just clone and run it. Needs the fftw3 and pulse libraries to compile
+(libpulse-dev libfftw3-dev on debian-based distros).
 ```
 git clone https://github.com/Kuroneer/term_pa_spectrum
 cd term_pa_spectrum
 make run
 ```
+
 
 # Screenshots
 
