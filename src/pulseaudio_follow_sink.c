@@ -56,7 +56,7 @@ typedef struct state_t {
 void reset_state(state_t* state) {
     state->monitor_source_name[0] = '\0';
     state->monitor_source_name[255] = '\0';
-    state->running_index = 0;
+    state->running_index = PA_INVALID_INDEX;
     state->found = 0;
     state->pa_context_ready = 0;
     state->current_stream_source_index = PA_INVALID_INDEX;
@@ -166,7 +166,13 @@ static void pa_event_cb(pa_context* c, pa_subscription_event_type_t t, uint32_t 
         state_t* state_p = get_state_from_userdata(userdata);
 
         if (state_p->found && state_p->running_index == sink_index) {
-            state_p->found = 0; // The current running sink has changed, check sinks again
+            // The current running sink has changed, check sinks again
+            state_p->found = 0;
+        }
+        if (state_p->running_index == sink_index && (t & PA_SUBSCRIPTION_EVENT_TYPE_MASK) == PA_SUBSCRIPTION_EVENT_REMOVE) {
+            // The current running sink was removed, clean up
+            state_p->found = 0;
+            state_p->running_index = PA_INVALID_INDEX;
         }
 
 #ifdef DEBUG
@@ -213,8 +219,8 @@ static void pa_context_sink_list_cb(pa_context* c, const pa_sink_info* i, int eo
         state_t* state_p = get_state_from_userdata(userdata);
         strncpy(state_p->monitor_source_name, i->monitor_source_name, 256);
         if (state_p->monitor_source_name[255] == '\0') {
-            state_p->running_index = i->index;
             state_p->found = 1;
+            state_p->running_index = i->index;
         } else {
             state_p->monitor_source_name[255] = '\0';
             fprintf(stderr, "PA: Monitor source name too big: %s\n", state_p->monitor_source_name);
@@ -261,13 +267,16 @@ void pa_set_up_read_callback(unsigned int n_samples, unsigned int sample_rate, d
                 pa_operation = NULL;
             }
 
-            if (state_p->found && state_p->current_stream_source_index != state_p->running_index) {
+            if (state_p->current_stream_source_index != state_p->running_index) {
 #ifdef DEBUG
                 fprintf(stderr, "PA: Monitor source name for sink %d is \"%s\"\n", state_p->running_index, state_p->monitor_source_name);
 #endif
 
                 // This is for the stream //
                 if (state_p->stream) {
+#ifdef DEBUG
+                    fprintf(stderr, "PA: Disconnect stream\n");
+#endif
                     if (pa_stream_disconnect(state_p->stream) < 0) {
                         fprintf(stderr, "PA: Cannot disconnect stream: %s\n", pa_strerror(pa_context_errno(pa_context)));
                         quit(state_p, 0);
@@ -277,16 +286,26 @@ void pa_set_up_read_callback(unsigned int n_samples, unsigned int sample_rate, d
                     state_p->stream = NULL;
                 }
 
-                if (!(state_p->stream = pa_stream_new(pa_context, "terminal pulseaudio spectrum stream", state_p->sample_spec, NULL))) {
-                    fprintf(stderr, "PA: Cannot create stream: %s\n", pa_strerror(pa_context_errno(pa_context)));
-                    quit(state_p, 0);
-                } else {
-                    pa_stream_set_state_callback(state_p->stream, pa_stream_state_cb, state_p);
-                    pa_stream_set_read_callback(state_p->stream, pa_stream_read_cb, state_p);
+                if (state_p->running_index != PA_INVALID_INDEX) {
+#ifdef DEBUG
+                    fprintf(stderr, "PA: Create stream\n");
+#endif
+                    if (!(state_p->stream = pa_stream_new(pa_context, "terminal pulseaudio spectrum stream", state_p->sample_spec, NULL))) {
+                        fprintf(stderr, "PA: Cannot create stream: %s\n", pa_strerror(pa_context_errno(pa_context)));
+                        quit(state_p, 0);
+                    } else {
+#ifdef DEBUG
+                    fprintf(stderr, "PA: Connect stream\n");
+#endif
+                        pa_stream_set_state_callback(state_p->stream, pa_stream_state_cb, state_p);
+                        pa_stream_set_read_callback(state_p->stream, pa_stream_read_cb, state_p);
 
-                    if (pa_stream_connect_record(state_p->stream, state_p->monitor_source_name, state_p->buffer_attr, 0) < 0) {
-                        fprintf(stderr, "PA: Cannot connect to source %s: %s\n", state_p->monitor_source_name, pa_strerror(pa_context_errno(pa_context)));
+                        if (pa_stream_connect_record(state_p->stream, state_p->monitor_source_name, state_p->buffer_attr, 0) < 0) {
+                            fprintf(stderr, "PA: Cannot connect to source %s: %s\n", state_p->monitor_source_name, pa_strerror(pa_context_errno(pa_context)));
+                        }
                     }
+                } else {
+                    state_p->output_cb(1, state_p->output_userdata);
                 }
                 ////////////////////////////
 
