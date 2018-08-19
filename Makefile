@@ -59,7 +59,8 @@ run: $(NAME)
 
 .PHONY: clean
 clean:
-	rm -rf $(BUILDDIR) $(NAME)
+	rm -rf $(BUILDDIR)/*.[od] $(NAME)
+	rmdir $(BUILDDIR)
 
 
 # Careful, it does not detect the changes in
