@@ -206,12 +206,12 @@ void output_set_sigmoid_scale_factor(output_context* out_ctx, double factor) {
 }
 
 void output_update_silence_buffer(output_context* out_ctx) {
-    unsigned int num_chars = ceil((float) out_ctx->num_points / (float) out_ctx->visualization_points_per_char) + .5, i;
+    unsigned int num_chars = out_ctx->num_points / out_ctx->visualization_points_per_char + (out_ctx->num_points % out_ctx->visualization_points_per_char ? 1 : 0);
 
     out_ctx->wchar_silence_buffer[num_chars] = '\0';
     wchar_t* silence_str_source = (out_ctx->provided_silence_str) ? out_ctx->provided_silence_str : silence_str;
     wcsncpy(out_ctx->wchar_silence_buffer, silence_str_source, num_chars);
-    for (i = wcslen(silence_str_source); i < num_chars; ++i) {
+    for (unsigned int i = wcslen(silence_str_source); i < num_chars; ++i) {
         out_ctx->wchar_silence_buffer[i] = L' ';
     }
 }
@@ -394,7 +394,7 @@ wchar_t* output_print(output_context* out_ctx, double* values) {
         }
         wchar_buffer[++wchar_index] = symbols[current_symbol_index]; // wchar_index != i for multipoint chars
     }
-    wchar_buffer[wchar_index] = '\0';
+    wchar_buffer[++wchar_index] = '\0';
     return wchar_buffer;
 }
 
