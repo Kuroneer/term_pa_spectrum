@@ -6,7 +6,7 @@ It offers several configuration options, such as frequencies to use, sample
 size, sample rate... and output options such as charset to use, different
 aggregation functions, different trigger levels...  
 
-In the future, I plan to include a widget for awesomewm.
+A widget for awesomewm 4.0 is included
 
 ## Getting Started
 
