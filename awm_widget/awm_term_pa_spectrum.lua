@@ -215,20 +215,22 @@ do
     end
 
     function widget:trigger_resize(placeholder, wibox, width, height)
-        if width > 0 and height > 0 then
-            local x, y = widget_corner_in_wibox(placeholder, wibox)
-            if x then
-                self.client:geometry{
-                    x = x + wibox.x,
-                    y = y + wibox.y,
-                    height = height,
-                    width = width,
-                }
-                self.client.hidden = false
-                return
+        if self.client then
+            if width > 0 and height > 0 then
+                local x, y = widget_corner_in_wibox(placeholder, wibox)
+                if x then
+                    self.client:geometry{
+                        x = x + wibox.x,
+                        y = y + wibox.y,
+                        height = height,
+                        width = width,
+                    }
+                    self.client.hidden = false
+                    return
+                end
             end
+            self.client.hidden = true
         end
-        self.client.hidden = true
     end
 end
 
