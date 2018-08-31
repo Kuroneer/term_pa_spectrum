@@ -77,16 +77,18 @@ function widget:add_placeholder(placeholder_wibar, provided_options)
         wibar = placeholder_wibar,
         index = #self.placeholders,
         fit = function(self, context, width, height)
+            local w_slack = 0
             if self == widget.holder and placeholder_wibar.visible then
                 self.width, self.height = math.min(width, options.width), math.min(height, options.height)
+                w_slack = 2
             else
                 self.width, self.height = 0, 0
             end
-            if self == widget.holder then
-                widget:trigger_resize(self, context.wibox, self.width, self.height)
-            end
-            return self.width, self.height
-        end
+            return self.width + w_slack, self.height
+        end,
+        draw = function(self, context, cairo, width, height)
+            widget:trigger_resize(self, context.wibox, self.width, self.height)
+        end,
     }
     table.insert(self.placeholders, placeholder)
 
@@ -213,26 +215,20 @@ do
     end
 
     function widget:trigger_resize(placeholder, wibox, width, height)
-        if self.client and not self.resize_planned then
-            self.resize_planned = true
-            timer.delayed_call(function()
-                self.resize_planned = false
-                if width > 0 and height > 0 then
-                    local x, y = widget_corner_in_wibox(placeholder, wibox)
-                    if x then
-                        self.client:geometry{
-                            x = x + wibox.x,
-                            y = y + wibox.y,
-                            height = height,
-                            width = width,
-                        }
-                        self.client.hidden = false
-                        return
-                    end
-                end
-                self.client.hidden = true
-            end)
+        if width > 0 and height > 0 then
+            local x, y = widget_corner_in_wibox(placeholder, wibox)
+            if x then
+                self.client:geometry{
+                    x = x + wibox.x,
+                    y = y + wibox.y,
+                    height = height,
+                    width = width,
+                }
+                self.client.hidden = false
+                return
+            end
         end
+        self.client.hidden = true
     end
 end
 
