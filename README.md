@@ -1,3 +1,7 @@
+# Notice
+
+Archived
+
 # Term PA Spectrum
 
 **Term PA Spectrum** is a simple program to display the spectrum of the sound
